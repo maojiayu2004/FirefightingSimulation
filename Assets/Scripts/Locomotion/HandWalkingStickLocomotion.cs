@@ -5,26 +5,24 @@ using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Readers;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Movement;
-using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 
 /// <summary>
-/// Hand-tracking "walking stick" locomotion, driving the rig's standard XRI move and smooth turn providers.
+/// Hand-tracking "walking stick" locomotion, driving the rig's standard XRI move provider.
 ///
 ///  Walk: make a fist with either hand, as if gripping a walking stick, and swing it forward and back
 ///  from the shoulder. The faster the swing, the faster the player walks (up to the move provider's
 ///  Move Speed), in the direction the head faces. One swinging fist is enough, so the player can walk
 ///  while the other hand holds the extinguisher. A hand that is holding something never walks.
 ///
-///  Turn: from the fist, lift the thumb into a thumbs-up and tilt the hand so the thumb points left or
-///  right. The further the tilt, the faster the turn (up to the turn provider's Turn Speed). Either hand
-///  can turn, and a fist can walk and turn at the same time.
+///  Turn: physically turn the body. There is deliberately no turn gesture: an earlier thumbs-up tilt
+///  gesture misfired while the thumb was still tucking into the fist and spun the view, which caused
+///  motion sickness.
 ///
 /// Swing speed is the fist's velocity relative to the head, so physically walking or leaning does not
 /// count. Only forward/back and up/down motion counts; sideways motion is reaching across the body.
-/// Only the thumb's sideways tilt counts, so the forward/back pitch of a swinging fist does not turn.
 ///
-/// The providers' left-hand input is set to Manual Value and written every frame; their right-hand
-/// (controller thumbstick) input is turned off, so controllers cannot move or turn in this mode.
+/// The move provider's left-hand input is set to Manual Value and written every frame; its right-hand
+/// (controller thumbstick) input is turned off, so controllers cannot move in this mode.
 ///
 /// Hierarchy (built by the locomotion scene builder):
 ///   XR Origin / Locomotion
@@ -37,9 +35,6 @@ public class HandWalkingStickLocomotion : MonoBehaviour
 {
     [Tooltip("Move provider driven by the swinging fists. Its Move Speed is the top walking speed.")]
     [SerializeField] private ContinuousMoveProvider moveProvider;
-
-    [Tooltip("Smooth turn provider driven by the thumb tilt. Its Turn Speed is the top turning speed.")]
-    [SerializeField] private ContinuousTurnProvider turnProvider;
 
     [Tooltip("The XR Origin's camera. Swings are measured relative to it, and it sets the walking direction.")]
     [SerializeField] private Transform head;
@@ -73,24 +68,9 @@ public class HandWalkingStickLocomotion : MonoBehaviour
     [Tooltip("How quickly walking stops once no hand is in a fist.")]
     [SerializeField] private float stopTime = 0.1f;
 
-    [Header("Thumbs-Up (meters)")]
-    [Tooltip("Thumb tip at least this far from the curled index/middle fingers counts as a thumbs-up.")]
-    [SerializeField] private float thumbUpEnter = 0.05f;
-    [Tooltip("Thumb tip closer than this to the curled fingers ends the thumbs-up.")]
-    [SerializeField] private float thumbUpExit = 0.04f;
-
-    [Header("Turning (degrees of thumb tilt from straight up)")]
-    [Tooltip("Tilt below this does not turn, so a roughly upright thumb holds still.")]
-    [SerializeField] private float deadZoneAngle = 20f;
-    [Tooltip("Tilt at which the player turns at full speed.")]
-    [SerializeField] private float fullTurnAngle = 60f;
-    [Tooltip("Seconds to smooth the turn input over. Smooths joint jitter.")]
-    [SerializeField] private float turnSmoothingTime = 0.1f;
-
     private struct HandState
     {
         public bool isFist;
-        public bool isThumbUp;
         public bool hasPreviousOffset;
         public Vector3 previousOffset;
         public Vector3 swingVelocity;
@@ -98,20 +78,16 @@ public class HandWalkingStickLocomotion : MonoBehaviour
 
     private static readonly List<XRHandSubsystem> s_Subsystems = new List<XRHandSubsystem>();
 
-    // Below this the input is sent as zero so the providers end locomotion (and the comfort vignette fades).
+    // Below this the input is sent as zero so the provider ends locomotion (and the comfort vignette fades).
     private const float k_InputEpsilon = 0.01f;
 
     private HandState _left;
     private HandState _right;
     private float _move;
-    private float _turn;
     private Vector3 _headForward = Vector3.forward;
 
     /// <summary>Walking input, 0 to 1 of the move provider's Move Speed.</summary>
     public float MoveInput => _move;
-
-    /// <summary>Turning input, -1 (left) to 1 (right) of the turn provider's Turn Speed.</summary>
-    public float TurnInput => _turn;
 
     private void Awake()
     {
@@ -120,12 +96,6 @@ public class HandWalkingStickLocomotion : MonoBehaviour
             moveProvider.leftHandMoveInput.inputSourceMode = XRInputValueReader.InputSourceMode.ManualValue;
             moveProvider.rightHandMoveInput.inputSourceMode = XRInputValueReader.InputSourceMode.Unused;
         }
-
-        if (turnProvider != null)
-        {
-            turnProvider.leftHandTurnInput.inputSourceMode = XRInputValueReader.InputSourceMode.ManualValue;
-            turnProvider.rightHandTurnInput.inputSourceMode = XRInputValueReader.InputSourceMode.Unused;
-        }
     }
 
     private void OnDisable()
@@ -133,7 +103,6 @@ public class HandWalkingStickLocomotion : MonoBehaviour
         _left = default;
         _right = default;
         _move = 0f;
-        _turn = 0f;
         WriteInputs();
     }
 
@@ -144,15 +113,14 @@ public class HandWalkingStickLocomotion : MonoBehaviour
             return;
 
         float swingSpeed = 0f;
-        float turn = 0f;
         bool anyFist = false;
 
         var subsystem = GetHandSubsystem();
         if (subsystem != null && head != null)
         {
-            GetHeadFrame(out Vector3 headPosition, out Vector3 forward, out Vector3 right);
-            UpdateHand(subsystem.leftHand, leftHandInteractor, ref _left, headPosition, forward, right, deltaTime, ref swingSpeed, ref turn, ref anyFist);
-            UpdateHand(subsystem.rightHand, rightHandInteractor, ref _right, headPosition, forward, right, deltaTime, ref swingSpeed, ref turn, ref anyFist);
+            GetHeadFrame(out Vector3 headPosition, out Vector3 forward);
+            UpdateHand(subsystem.leftHand, leftHandInteractor, ref _left, headPosition, forward, deltaTime, ref swingSpeed, ref anyFist);
+            UpdateHand(subsystem.rightHand, rightHandInteractor, ref _right, headPosition, forward, deltaTime, ref swingSpeed, ref anyFist);
         }
         else
         {
@@ -163,14 +131,13 @@ public class HandWalkingStickLocomotion : MonoBehaviour
         float target = anyFist ? Mathf.InverseLerp(minSwingSpeed, fullSwingSpeed, swingSpeed) : 0f;
         float responseTime = !anyFist ? stopTime : target > _move ? speedUpTime : slowDownTime;
         _move = Mathf.Lerp(_move, target, Smoothing(responseTime, deltaTime));
-        _turn = Mathf.Lerp(_turn, Mathf.Clamp(turn, -1f, 1f), Smoothing(turnSmoothingTime, deltaTime));
 
         WriteInputs();
     }
 
     private void UpdateHand(XRHand hand, XRBaseInteractor interactor, ref HandState state,
-        Vector3 headPosition, Vector3 forward, Vector3 right, float deltaTime,
-        ref float swingSpeed, ref float turn, ref bool anyFist)
+        Vector3 headPosition, Vector3 forward, float deltaTime,
+        ref float swingSpeed, ref bool anyFist)
     {
         if (!hand.isTracked || (interactor != null && interactor.hasSelection))
         {
@@ -201,39 +168,6 @@ public class HandWalkingStickLocomotion : MonoBehaviour
             state.previousOffset = offset;
             state.hasPreviousOffset = true;
         }
-
-        turn += ThumbTilt(hand, ref state, right);
-    }
-
-    /// <summary>
-    /// -1 to 1 turn input from a thumbs-up tilted left or right, or 0 when the thumb is wrapped around
-    /// the fist, upright within the dead zone, or pointing mostly forward or back.
-    /// </summary>
-    private float ThumbTilt(XRHand hand, ref HandState state, Vector3 right)
-    {
-        if (!TryGetPosition(hand, XRHandJointID.ThumbProximal, out Vector3 thumbBase) ||
-            !TryGetPosition(hand, XRHandJointID.ThumbTip, out Vector3 thumbTip) ||
-            !TryGetPosition(hand, XRHandJointID.IndexIntermediate, out Vector3 indexMiddle) ||
-            !TryGetPosition(hand, XRHandJointID.MiddleIntermediate, out Vector3 middleMiddle))
-        {
-            state.isThumbUp = false;
-            return 0f;
-        }
-
-        // In an ordinary fist the thumb tip rests on the curled index/middle fingers; in a thumbs-up it is clear of them.
-        float clearance = Mathf.Min(Vector3.Distance(thumbTip, indexMiddle), Vector3.Distance(thumbTip, middleMiddle));
-        state.isThumbUp = state.isThumbUp ? clearance > thumbUpExit : clearance >= thumbUpEnter;
-        if (!state.isThumbUp)
-            return 0f;
-
-        Vector3 thumb = thumbTip - thumbBase;
-        float sideways = Vector3.Dot(thumb, right);
-        float upward = thumb.y;
-        if (new Vector2(sideways, upward).magnitude < 0.5f * thumb.magnitude)
-            return 0f;
-
-        float angle = Mathf.Atan2(sideways, upward) * Mathf.Rad2Deg;
-        return Mathf.Sign(angle) * Mathf.InverseLerp(deadZoneAngle, fullTurnAngle, Mathf.Abs(angle));
     }
 
     private bool IsFist(XRHand hand, bool wasFist)
@@ -246,10 +180,10 @@ public class HandWalkingStickLocomotion : MonoBehaviour
     }
 
     /// <summary>
-    /// Head position, and its horizontal forward and right directions, in tracking space.
+    /// Head position, and its horizontal forward direction, in tracking space.
     /// Looking straight up or down keeps the last forward direction.
     /// </summary>
-    private void GetHeadFrame(out Vector3 position, out Vector3 forward, out Vector3 right)
+    private void GetHeadFrame(out Vector3 position, out Vector3 forward)
     {
         Transform space = trackingSpace != null ? trackingSpace : head.parent;
         position = space != null ? space.InverseTransformPoint(head.position) : head.position;
@@ -259,15 +193,12 @@ public class HandWalkingStickLocomotion : MonoBehaviour
             _headForward = headForward.normalized;
 
         forward = _headForward;
-        right = Vector3.Cross(Vector3.up, forward);
     }
 
     private void WriteInputs()
     {
         if (moveProvider != null)
             moveProvider.leftHandMoveInput.manualValue = new Vector2(0f, _move > k_InputEpsilon ? _move : 0f);
-        if (turnProvider != null)
-            turnProvider.leftHandTurnInput.manualValue = new Vector2(Mathf.Abs(_turn) > k_InputEpsilon ? _turn : 0f, 0f);
     }
 
     /// <summary>Frame-rate independent lerp factor that closes most of the gap in about <paramref name="time"/> seconds.</summary>

@@ -95023,6 +95023,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mode: 1
   hazardRoom: {fileID: 0}
+  fireStarterKeywords:
+  - TV
+  - Fridge+Oven
+  - Stove
+  - Lamp
+  - Small Lamp
+  - Wall Lamp
   possibleHazards:
   - {fileID: 0}
   - {fileID: 0}
@@ -95046,6 +95053,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   clutterAmount: 0.062
+  hazardTagging: {fileID: 0}
   tileMaterial: {fileID: 2100000, guid: 15ee2042f27af81459dc4f0bc28046a0, type: 2}
   woodMaterial: {fileID: 2100000, guid: 15ee2042f27af81459dc4f0bc28046a0, type: 2}
   carpetMaterial: {fileID: 2100000, guid: 15ee2042f27af81459dc4f0bc28046a0, type: 2}
@@ -95064,6 +95072,18 @@ MonoBehaviour:
   chairPrefab: {fileID: 0}
   sideTablePrefab: {fileID: 0}
   shelfPrefab: {fileID: 0}
+  rug1Prefab: {fileID: 0}
+  rug2Prefab: {fileID: 0}
+  rug3Prefab: {fileID: 0}
+  longDresserPrefab: {fileID: 0}
+  tallDresserPrefab: {fileID: 0}
+  lampPrefab: {fileID: 0}
+  smallLampPrefab: {fileID: 0}
+  wallLampPrefab: {fileID: 0}
+  vasePrefab: {fileID: 0}
+  painting1Prefab: {fileID: 0}
+  painting2Prefab: {fileID: 0}
+  painting3Prefab: {fileID: 0}
   defaultsLoaded: 0
 --- !u!114 &1124687602
 MonoBehaviour:
@@ -95133,6 +95153,7 @@ MonoBehaviour:
   enableTeleportationOnFloors: 1
   destroyPreviousGeneration: 1
   roomRoofsTransparent: 1
+  houseParent: {fileID: 0}
 --- !u!4 &1124687603
 Transform:
   m_ObjectHideFlags: 0
@@ -113117,7 +113138,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   moveProvider: {fileID: 1395329950}
-  turnProvider: {fileID: 1395329951}
   head: {fileID: 1395329944}
   trackingSpace: {fileID: 2047998489}
   leftHandInteractor: {fileID: 1979772542828339383}
@@ -113130,11 +113150,6 @@ MonoBehaviour:
   speedUpTime: 0.15
   slowDownTime: 0.5
   stopTime: 0.1
-  thumbUpEnter: 0.05
-  thumbUpExit: 0.04
-  deadZoneAngle: 20
-  fullTurnAngle: 60
-  turnSmoothingTime: 0.1
 --- !u!1 &1313795883
 GameObject:
   m_ObjectHideFlags: 0
@@ -119857,6 +119872,10 @@ PrefabInstance:
       propertyPath: m_PhysicsLayerMask.m_Bits
       value: 1025
       objectReference: {fileID: 0}
+    - target: {fileID: 6480925242510836759, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6501755809687671949, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
       propertyPath: m_IsActive
       value: 1
@@ -119982,7 +120001,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 1395329943}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 75b29b6c6428c984a8a73ffc2d58063b, type: 3}
   m_Name: 
@@ -181697,6 +181716,7 @@ MonoBehaviour:
   enableTeleportationOnFloors: 1
   destroyPreviousGeneration: 1
   roomRoofsTransparent: 1
+  houseParent: {fileID: 0}
 --- !u!4 &2121615328
 Transform:
   m_ObjectHideFlags: 0
@@ -181726,6 +181746,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   clutterAmount: 0.062
+  hazardTagging: {fileID: 0}
   tileMaterial: {fileID: 2100000, guid: 15ee2042f27af81459dc4f0bc28046a0, type: 2}
   woodMaterial: {fileID: 2100000, guid: 15ee2042f27af81459dc4f0bc28046a0, type: 2}
   carpetMaterial: {fileID: 2100000, guid: 15ee2042f27af81459dc4f0bc28046a0, type: 2}
@@ -181744,6 +181765,18 @@ MonoBehaviour:
   chairPrefab: {fileID: 0}
   sideTablePrefab: {fileID: 0}
   shelfPrefab: {fileID: 0}
+  rug1Prefab: {fileID: 0}
+  rug2Prefab: {fileID: 0}
+  rug3Prefab: {fileID: 0}
+  longDresserPrefab: {fileID: 0}
+  tallDresserPrefab: {fileID: 0}
+  lampPrefab: {fileID: 0}
+  smallLampPrefab: {fileID: 0}
+  wallLampPrefab: {fileID: 0}
+  vasePrefab: {fileID: 0}
+  painting1Prefab: {fileID: 0}
+  painting2Prefab: {fileID: 0}
+  painting3Prefab: {fileID: 0}
   defaultsLoaded: 0
 --- !u!114 &2121615330
 MonoBehaviour:
@@ -181759,6 +181792,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mode: 1
   hazardRoom: {fileID: 0}
+  fireStarterKeywords:
+  - TV
+  - Fridge+Oven
+  - Stove
+  - Lamp
+  - Small Lamp
+  - Wall Lamp
   possibleHazards:
   - {fileID: 0}
   - {fileID: 0}

@@ -5,21 +5,21 @@ using UnityEngine.XR.Interaction.Toolkit.Locomotion;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Climbing;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Movement;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
-using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 
 /// <summary>
 /// Restricts the XR Origin (XR Rig) to a single locomotion technique so each locomotion
 /// study scene only offers the technique it is testing.
 ///
-/// Snap turn is always off, and turning is physical except in <see cref="Mode.WalkingStick"/>.
+/// Snap and smooth turn are always off, so in every mode the only way to turn is to physically
+/// turn the body.
 ///  - <see cref="Mode.Natural"/>: every locomotion provider and every teleport ray is
 ///    disabled, so the only way to move is to physically walk around the play space.
 ///  - <see cref="Mode.Teleport"/>: only the <see cref="TeleportationProvider"/> stays on.
 ///    Controllers keep their thumbstick teleport ray, and hands use
 ///    <see cref="HandTeleportGesture"/>.
-///  - <see cref="Mode.WalkingStick"/>: only the <see cref="ContinuousMoveProvider"/> and
-///    <see cref="ContinuousTurnProvider"/> stay on, driven by <see cref="HandWalkingStickLocomotion"/>
-///    (swing a fist to walk, tilt a thumbs-up to turn). Every teleport ray is disabled.
+///  - <see cref="Mode.WalkingStick"/>: only the <see cref="ContinuousMoveProvider"/> stays on,
+///    driven by <see cref="HandWalkingStickLocomotion"/> (swing a fist to walk). Every teleport
+///    ray is disabled.
 ///
 /// Components are disabled rather than GameObjects deactivated, because the starter rig's
 /// ControllerInputActionManager re-activates the teleport GameObjects on its own.
@@ -47,7 +47,7 @@ public class LocomotionModeConfigurator : MonoBehaviour
         foreach (var provider in GetComponentsInChildren<LocomotionProvider>(true))
         {
             provider.enabled = (teleport && provider is TeleportationProvider)
-                               || (walkingStick && (provider is ContinuousMoveProvider || provider is ContinuousTurnProvider));
+                               || (walkingStick && provider is ContinuousMoveProvider);
         }
 
         foreach (var climbTeleport in GetComponentsInChildren<ClimbTeleportInteractor>(true))

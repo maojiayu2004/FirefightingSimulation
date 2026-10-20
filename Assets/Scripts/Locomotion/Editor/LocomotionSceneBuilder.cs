@@ -10,7 +10,6 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.Interactors.Casters;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Movement;
-using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 
 /// <summary>
 /// Builds the locomotion study scenes from the hand tracking demo scene so the environment,
@@ -199,10 +198,9 @@ public static class LocomotionSceneBuilder
         Transform rightHand = all.FirstOrDefault(t => t.name == "Right Hand");
         var mediator = origin.GetComponentInChildren<LocomotionMediator>(true);
         var moveProvider = origin.GetComponentInChildren<ContinuousMoveProvider>(true);
-        var turnProvider = origin.GetComponentInChildren<ContinuousTurnProvider>(true);
-        if (mediator == null || moveProvider == null || turnProvider == null)
+        if (mediator == null || moveProvider == null)
         {
-            Debug.LogError("[Locomotion] Could not find the Locomotion mediator, move provider or smooth turn provider; walking stick not added.");
+            Debug.LogError("[Locomotion] Could not find the Locomotion mediator or move provider; walking stick not added.");
             return;
         }
 
@@ -212,7 +210,6 @@ public static class LocomotionSceneBuilder
 
         var so = new SerializedObject(walkingStick);
         so.FindProperty("moveProvider").objectReferenceValue = moveProvider;
-        so.FindProperty("turnProvider").objectReferenceValue = turnProvider;
         so.FindProperty("head").objectReferenceValue = origin.Camera.transform;
         so.FindProperty("trackingSpace").objectReferenceValue = origin.CameraFloorOffsetObject.transform;
         so.FindProperty("leftHandInteractor").objectReferenceValue = leftHand != null ? leftHand.GetComponentInChildren<NearFarInteractor>(true) : null;
