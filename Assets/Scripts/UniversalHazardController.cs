@@ -1,0 +1,444 @@
+using System.Collections;
+using System.Collections.Generic;
+using Unity.AI.Navigation;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+using UnityEngine;
+using UnityEngine.AI;
+using UnityEngine.InputSystem;
+using Ignis;
+
+public class UniversalHazardController : MonoBehaviour
+{
+    // Variables to set in the public editor -- all will be passed to the produced state model
+    [Header("PLAYER TO THREATEN")]
+    public GameObject player; // could change this later to an array to affect multiple things
+
+    [Header("HAZARDS TO MODEL")]
+    [Space(10)]
+
+    public GameObject[] hazards;
+
+    [Header("HAZARD ATTRIBUTES")]
+    [Space(10)]
+
+    [Header("Inciting Values")] // How likely are specific behaviors to happen
+    [Range(0, 10)] public int aggressionLevel;
+    [Range(0, 10)] public int cautionLevel;
+    [Range(0, 10)] public int speed;
+
+    [Header("Trigger Values")] // What triggers specific behaviors
+    public int noticeDistance;
+    public int touchingDistance;
+
+    [Header("Scale Settings")]
+    public Vector3 targetMaxScale;
+    public float transitionDuration;
+
+    [Header("Behavior Bools")] // Is a specific behavior present or not
+    public bool patrolling;
+    public bool approaching;
+    public bool attacking;
+    public bool looming; // growing larger than the player so the player has to look up at it
+    public bool spreading;
+
+    [Header("Hazard Boundaries")] // What limits or ends the hazard's behaviors
+    public int escapeNoticeDistance;
+    public int timeToLoseInterestOrEffect;
+    public NavMeshSurface hazardTerritory;
+
+    // Vars for functions
+    private Coroutine scaleCoroutine;
+    // currently active hazards and their original colors in the simulation
+    private Dictionary<GameObject, Material> originalColors = new Dictionary<GameObject, Material>();
+    // hazards that have been sucessfully extinguished
+    private List<GameObject> extinguishedHazards = new List<GameObject>();
+    private List<GameObject> activeHazards = new List<GameObject>();
+    HazardTagging tagging;
+
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    void Start()
+    {
+        tagging = FindFirstObjectByType<HazardTagging>();
+    }
+
+    void Update()
+    {
+        // If the reset button is pressed, reset other objects
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame) //if (Input.GetKeyDown(KeyCode.Space))
+        {
+            Debug.Log("Calling reset on other objects!");
+            resetAffectedObjects();
+        }
+    }
+
+    private void SetHazardBehaviors()
+    {
+        if (hazards == null || hazards.Length == 0) return;
+
+        foreach (GameObject haz in hazards)
+        {
+            if (haz == null) continue;
+
+            // Check if it already has the component to avoid duplicates
+            HazardBehaviorModel model = haz.GetComponent<HazardBehaviorModel>();
+
+            if (model == null)
+            {
+#if UNITY_EDITOR
+                // Ensures the operation is registered in the Editor's undo history and persists
+                model = Undo.AddComponent<HazardBehaviorModel>(haz);
+#else
+                model = haz.AddComponent<HazardBehaviorModel>();
+#endif
+            }
+
+            // Pass parameters safely
+            model.Initialize(
+                this, player,
+                aggressionLevel, cautionLevel, speed, noticeDistance, touchingDistance,
+                patrolling, approaching, attacking, looming, spreading,
+                escapeNoticeDistance, timeToLoseInterestOrEffect, hazardTerritory
+            );
+
+#if UNITY_EDITOR
+            // Tell Unity the object's state changed so it saves the new variable values
+            EditorUtility.SetDirty(model);
+#endif
+        }
+
+        Debug.Log($"Successfully initialized hazard models for {hazards.Length} objects.");
+    }
+
+    // Allows us to set the behaviors on each hazard once we're done.
+    // This custom inspector must not be compiled into player/headset builds.
+#if UNITY_EDITOR
+    [CustomEditor(typeof(UniversalHazardController))]
+    public class HazardControllerEditor : Editor
+    {
+        public override void OnInspectorGUI()
+        {
+            // Draw the default inspector variables (like the hazards array)
+            DrawDefaultInspector();
+
+            UniversalHazardController script = (UniversalHazardController)target;
+
+            GUILayout.Space(10);
+
+            // Match your styling preference
+            GUI.backgroundColor = new Color(0.3f, 0.6f, 0.9f);
+            if (GUILayout.Button("Set Hazard Behaviors", GUILayout.Height(30)))
+            {
+                // This ensures changes are recorded for saving
+                Undo.RecordObject(script, "Set Hazard Behaviors");
+                script.SetHazardBehaviors();
+            }
+        }
+    }
+#endif
+
+    public void resetHazard(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        Debug.Log($"Resetting {model.gameObject.name} hazard behavior to passive movements");
+        // Resets hazard to do a passive behavior
+        PassiveMovement(agent, model);
+        TriggerShrink(model);
+        model.alreadyTriggeredByPlayer = false;
+    }
+
+    public void resetAffectedObjects()
+    {
+        Debug.Log($"Resetting any gameObjects altered by the hazard");
+
+        // A full scenario reset is intentionally different from extinguishing:
+        // all direct and radiated TIC warmth clears immediately.
+        ThermalRadiationManager.ResetAllTemperatures();
+
+        // Reset colors of marked/spread gameobjects
+        foreach (var pair in originalColors)
+        {
+            pair.Key.GetComponent<Renderer>().material = pair.Value;
+            pair.Key.tag = "Possible Hazard";
+
+            // track the heat on the object
+            if (pair.Key.TryGetComponent<HazardTemperature>(out HazardTemperature temp))
+            {
+                temp.ResetTemperature(); // Snaps thermal view to blue instantly
+            }
+        }
+    }
+
+    public void resetSingleObject(GameObject hazard)
+    {
+        Debug.Log($"Resetting a specific game object fixed by the user");
+
+        // Reset colors of marked/spread gameobjects
+        foreach (var pair in originalColors)
+        {
+            if (pair.Key == hazard)
+            {
+                pair.Key.GetComponent<Renderer>().material = pair.Value;
+                pair.Key.tag = "Possible Hazard";
+
+                // pass the list to tagging system so it can update, too
+                tagging.CheckHazardStatus(originalColors);
+
+                // track the heat on the object
+                if (pair.Key.TryGetComponent<HazardTemperature>(out HazardTemperature temp))
+                {
+                    // A player extinguishing one object leaves residual surface
+                    // warmth. resetAffectedObjects remains the full scenario reset.
+                    temp.Extinguish();
+                }
+            }
+        }
+    }
+
+    public void AlertedMovement(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        if (model.approaching)
+        {
+            Approaching(agent, model);
+        }
+
+        if (model.looming)
+        {
+            Looming(agent, model);
+        }
+    }
+
+    public void PassiveMovement(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        /*if (camping)
+        {
+            Camping();
+        }*/
+
+        if (model.patrolling)
+        {
+            Patrolling(agent, model);
+        }
+    }
+
+    public void Approaching(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        // Simply set destination to player
+        //Debug.Log($"{model.gameObject.name} is approaching player");
+        agent.SetDestination(model.player.transform.position);
+
+        if (model.distanceToPlayer < model.touchingDistance)
+        {
+            TouchingMovement(agent, model);
+        }
+    }
+
+    public void TouchingMovement(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        if (model.attacking)
+        {
+            // We only start the attack routine if it isn't already running
+            //Debug.Log($"{model.gameObject.name} got close to player to attack");
+            if (!model.isAttacking)
+            {
+                StartCoroutine(AttackSequence(agent, model));
+            }
+        }
+        else
+        {
+            //Debug.Log($"{model.gameObject.name} got close to player but won't attack");
+            resetHazard(agent, model);
+        }
+    }
+
+    public void Looming(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        // Simply set destination to player
+        //Debug.Log($"{model.gameObject.name} is looming over player");
+
+        // Stop any currently running scale transition to prevent conflicts
+        if (model.activeScaleCoroutine != null)
+        {
+            StopCoroutine(model.activeScaleCoroutine);
+        }
+
+        // Start the smooth scaling coroutine towards the target max scale
+        model.activeScaleCoroutine = StartCoroutine(ScaleOverTime(model, targetMaxScale));
+    }
+
+    public void TriggerShrink(HazardBehaviorModel model)
+    {
+        if (model.activeScaleCoroutine != null)
+        {
+            StopCoroutine(model.activeScaleCoroutine);
+        }
+
+        // Start the smooth scaling coroutine back towards the original scale
+        model.activeScaleCoroutine = StartCoroutine(ScaleOverTime(model, model.originalScale));
+    }
+
+    public void Spreading(HazardBehaviorModel model)
+    {
+        if (model == null || model.lastTouchedObject == null)
+            return;
+
+        GameObject hazard = model.lastTouchedObject;
+
+        FlammableObject sourceFire = model.GetComponent<FlammableObject>();
+        FlammableObject targetFire = hazard.GetComponent<FlammableObject>();
+        if (sourceFire == null || targetFire == null || !sourceFire.onFire)
+            return;
+
+        // This method runs on every client so the authority of the touched fire can
+        // advance its own ignition even when the moving hazard has a different owner.
+        if (!NetworkedFireState.LocalClientMayAffectFire(targetFire))
+            return;
+
+        Collider targetCollider = hazard.GetComponent<Collider>();
+        Vector3 sourcePosition = sourceFire.GetFireOrigin();
+        Vector3 ignitionPoint = targetCollider != null
+            ? targetCollider.ClosestPoint(sourcePosition)
+            : sourcePosition;
+
+        // Respect the target's fire profile: contact adds ignition progress over
+        // time instead of forcing an instant fire or changing its on-start option.
+        targetFire.TryToSetOnFireIgniteProgressIncrease(ignitionPoint, Time.deltaTime);
+
+        // Contact alone is not an active fire. Wait until Ignis actually ignites it.
+        if (!targetFire.onFire)
+            return;
+
+        hazard.tag = "Active Hazard";
+
+        // Use TryAdd so that it only adds the material the first time (doesn't overwrite the original material as touching continues)
+        Renderer hazardRenderer = hazard.GetComponent<Renderer>();
+        if (hazardRenderer != null)
+            originalColors.TryAdd(hazard, hazardRenderer.material);
+        if (tagging != null)
+            tagging.CheckHazardStatus(originalColors);
+
+        // Adding the hazard temp component
+        if (!hazard.TryGetComponent<HazardTemperature>(out HazardTemperature temp))
+        {
+            // Assign the newly added component to 'temp' and ignite it so we can use it right away
+            temp = hazard.AddComponent<HazardTemperature>();
+        }
+
+        // NETWORKING: replicate the heat visual so remote clients show the same
+        // thermal-camera glow (this method only runs on the fire authority).
+        if (hazard.TryGetComponent<NetworkedFireState>(out NetworkedFireState fireState))
+        {
+            fireState.SetHeatVisual(true);
+        }
+        else
+        {
+            temp.Ignite();
+        }
+
+        // Change its color to red to visually mark the difference
+        //model.lastTouchedObject.GetComponent<Renderer>().material = Resources.Load<Material>("Materials/Red");
+    }
+
+    // The Coroutine that handles the actual frame-by-frame interpolation
+    private IEnumerator ScaleOverTime(HazardBehaviorModel model, Vector3 targetScale)
+    {
+        Debug.Log($"Scaling");
+        Vector3 initialScale = model.gameObject.transform.localScale;
+        float elapsedTime = 0f;
+
+        while (elapsedTime < transitionDuration)
+        {
+            elapsedTime += Time.deltaTime;
+
+            // Calculate progress (normalized between 0 and 1)
+            float t = elapsedTime / transitionDuration;
+
+            // Smoothstep creates an organic "ease-in-ease-out" motion 
+            // instead of a rigid linear transition
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            model.gameObject.transform.localScale = Vector3.Lerp(initialScale, targetScale, smoothT);
+
+            // Wait until the next frame before continuing the loop
+            yield return null;
+        }
+
+        // Snap to exact target scale at the end to clean up precision errors
+        model.gameObject.transform.localScale = targetScale;
+        model.activeScaleCoroutine = null;
+    }
+
+    public void Patrolling(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        //Debug.Log($"{model.gameObject.name} is patrolling passively");
+        // Check if we've reached our destination or don't have one
+        if (!agent.pathPending && agent.remainingDistance < 0.5f)
+        {
+            // Find a random point on the NavMesh
+            Vector3 randomPoint = GetRandomPointOnNavMesh(model.hazardTerritory.transform.position, 10f);
+            agent.SetDestination(randomPoint);
+        }
+    }
+
+    public void Camping(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        //Debug.Log($"{model.gameObject.name} is camping passively");
+        // Use the agent to move instead of snapping transform (looks smoother)
+        // If you want it instant, keep your old line. If you want it to walk back, use this:
+        agent.SetDestination(model.initialHazardPosition);
+    }
+
+    // The Attack Sequence Coroutine
+    IEnumerator AttackSequence(NavMeshAgent agent, HazardBehaviorModel model)
+    {
+        Debug.Log($"{model.gameObject.name} is attacking");
+        model.isAttacking = true;
+
+        // Cache original speed to restore later
+        float originalSpeed = agent.speed;
+        float lungeSpeed = originalSpeed * 3f; // Move fast!
+
+        for (int rounds = 0; rounds < 3; rounds++)
+        {
+            // Lunge AT the player
+            agent.speed = lungeSpeed;
+            agent.SetDestination(model.player.transform.position);
+
+            // Wait until we are very close or 1 second has passed (timeout)
+            float timer = 0f;
+            while (Vector3.Distance(transform.position, model.player.transform.position) > 1.5f && timer < 1.0f)
+            {
+                timer += Time.deltaTime;
+                agent.SetDestination(model.player.transform.position); // Keep tracking
+                yield return null; // Wait for next frame
+            }
+
+            // Back up / Retreat slightly
+            Vector3 retreatDir = (transform.position - model.player.transform.position).normalized;
+            Vector3 retreatPos = transform.position + (retreatDir * 3.0f); // Back up 3 meters
+
+            agent.speed = originalSpeed; // Back up at normal speed
+            agent.SetDestination(retreatPos);
+
+            // Wait for 0.5 seconds while backing up
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        // Reset state
+        agent.speed = originalSpeed;
+        model.isAttacking = false;
+        resetHazard(agent, model);
+    }
+
+    // Standard helper to find a random point on a NavMesh within a radius
+    Vector3 GetRandomPointOnNavMesh(Vector3 center, float range)
+    {
+        Vector3 randomPoint = center + Random.insideUnitSphere * range;
+        NavMeshHit hit;
+        if (NavMesh.SamplePosition(randomPoint, out hit, 1.0f, NavMesh.AllAreas))
+        {
+            return hit.position;
+        }
+        return center; // Fallback
+    }
+}
