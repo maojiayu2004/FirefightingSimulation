@@ -38,6 +38,7 @@ public class RoomSmokeController : MonoBehaviour
         public float currentColorIntensity;
         public float transitionStartAlpha;
         public float transitionStartColorIntensity;
+        public float initialGrowthDelay;
         public float dispersalDelay;
     }
 
@@ -48,6 +49,15 @@ public class RoomSmokeController : MonoBehaviour
     [Header("Smoke Zones")]
     [Tooltip("Manually placed Ignis smoke objects that should fade after the fire is extinguished.")]
     public List<SmokeZone> smokeZones = new List<SmokeZone>();
+
+    [Header("Initial Smoke Growth")]
+    [Tooltip("Seconds each zone takes to reach its authored appearance after the first ignition.")]
+    [Min(0f)]
+    public float initialGrowthDuration = 10f;
+
+    [Tooltip("Maximum extra delay before the farthest smoke zone begins to appear.")]
+    [Min(0f)]
+    public float initialMaximumDistanceDelay = 4f;
 
     [Header("Dispersal Timing")]
     [Tooltip("Seconds each smoke zone takes to fade completely.")]
@@ -70,6 +80,7 @@ public class RoomSmokeController : MonoBehaviour
     private readonly List<SmokeZoneRuntime> runtimeZones = new List<SmokeZoneRuntime>();
     private NetworkedFireState networkedFireState;
     private SmokeState currentState = SmokeState.Dormant;
+    private bool isInitialGrowth;
     private double stateStartTime;
     private int observedIgnitionEpoch;
     private bool hasObservedIgnition;
@@ -135,13 +146,19 @@ public class RoomSmokeController : MonoBehaviour
         // its post-extinguish visual fade.
         if (lifecycle.IsExtinguished || lifecycle.IsBurnedOut)
         {
+            double dispersalStartTime = GetTransitionStartTime(
+                lifecycle.ExtinguishmentStartTime,
+                lifecycle.CurrentTime);
+            if (currentState != SmokeState.Dispersed &&
+                lifecycle.CurrentTime - dispersalStartTime <
+                Mathf.Max(0f, fadeDuration) + Mathf.Max(0f, maximumDistanceDelay))
+                EnsureSmokeSourcesIgnited();
+
             if (currentState == SmokeState.Dormant)
                 PrepareAuthoredAppearanceForLateExtinguish();
 
             if (currentState != SmokeState.Dispersing && currentState != SmokeState.Dispersed)
-                BeginDispersal(GetTransitionStartTime(
-                    lifecycle.ExtinguishmentStartTime,
-                    lifecycle.CurrentTime));
+                BeginDispersal(dispersalStartTime);
 
             if (currentState == SmokeState.Dispersing)
                 UpdateDispersal(lifecycle.CurrentTime);
@@ -151,6 +168,8 @@ public class RoomSmokeController : MonoBehaviour
 
         if (lifecycle.IsBurning)
         {
+            EnsureSmokeSourcesIgnited();
+
             if (currentState == SmokeState.Dormant ||
                 currentState == SmokeState.Dispersing ||
                 currentState == SmokeState.Dispersed ||
@@ -198,7 +217,7 @@ public class RoomSmokeController : MonoBehaviour
 
     /// <summary>
     /// Validates zone references, records their original alpha and color intensity,
-    /// and calculates how much later each zone should begin fading.
+    /// and calculates distance-based delays for growth and dispersal.
     /// </summary>
     private void InitializeSmokeZones()
     {
@@ -254,6 +273,33 @@ public class RoomSmokeController : MonoBehaviour
     }
 
     /// <summary>
+    /// Starts each local Ignis emitter when the stove lifecycle needs room smoke.
+    /// Keeping these sources active lets the controller handle the full fade and reignition.
+    /// </summary>
+    private void EnsureSmokeSourcesIgnited()
+    {
+        for (int i = 0; i < runtimeZones.Count; i++)
+        {
+            FlammableObject smokeSource = runtimeZones[i].settings.smokeSource;
+            if (smokeSource == null)
+                continue;
+
+            smokeSource.isEffectOnForever = true;
+            smokeSource.burnOutStart_s = float.MaxValue;
+            smokeSource.burnOutLength_s = float.MaxValue;
+            if (smokeSource.onFire)
+                continue;
+
+            // These emitters present smoke; their Ignis fire triggers must not
+            // ignite nearby flammable room objects.
+            smokeSource.spreadLayerMask = 0;
+            smokeSource.useFireSFX = false;
+            smokeSource.enableMaterialAnimation = false;
+            smokeSource.SetOnFireFromCenter();
+        }
+    }
+
+    /// <summary>
     /// Converts the fire temperature into a safe zero-to-one value for legacy fire
     /// sources that do not have a NetworkedFireState component.
     /// </summary>
@@ -266,8 +312,8 @@ public class RoomSmokeController : MonoBehaviour
     }
 
     /// <summary>
-    /// Assigns each zone a delay based on its distance from the stove. The nearest
-    /// zone starts immediately and the farthest receives the full configured delay.
+    /// Assigns each zone growth and dispersal delays based on its distance from
+    /// the stove. The nearest zone starts first in either transition.
     /// </summary>
     private void CalculateDistanceDelays()
     {
@@ -296,6 +342,7 @@ public class RoomSmokeController : MonoBehaviour
                 ? (distance - shortestDistance) / distanceRange
                 : 0f;
 
+            runtimeZones[i].initialGrowthDelay = normalizedDistance * Mathf.Max(0f, initialMaximumDistanceDelay);
             runtimeZones[i].dispersalDelay = normalizedDistance * Mathf.Max(0f, maximumDistanceDelay);
         }
     }
@@ -340,7 +387,24 @@ public class RoomSmokeController : MonoBehaviour
         }
 
         if (everyZoneFinished)
+        {
             currentState = SmokeState.Dispersed;
+            StopSmokeSources();
+        }
+    }
+
+    /// <summary>
+    /// Removes Ignis emitters after their room smoke has completely dispersed.
+    /// A later stove ignition starts fresh emitters through EnsureSmokeSourcesIgnited.
+    /// </summary>
+    private void StopSmokeSources()
+    {
+        for (int i = 0; i < runtimeZones.Count; i++)
+        {
+            FlammableObject smokeSource = runtimeZones[i].settings.smokeSource;
+            if (smokeSource != null && smokeSource.onFire)
+                smokeSource.ResetObj();
+        }
     }
 
     /// <summary>
@@ -361,29 +425,40 @@ public class RoomSmokeController : MonoBehaviour
     }
 
     /// <summary>
-    /// Begins a smooth return to every zone's authored appearance when the stove
-    /// reignites during or after smoke dispersal.
+    /// Begins growth on the first ignition or restores the current appearance after
+    /// a later ignition. Both transitions follow the stove's presentation clock.
     /// </summary>
     private void BeginRestoration(double transitionStartTime)
     {
+        isInitialGrowth = currentState == SmokeState.Dormant;
         CaptureTransitionStartValues();
         stateStartTime = transitionStartTime;
         currentState = SmokeState.Restoring;
     }
 
     /// <summary>
-    /// Restores all zones together without reapplying their distance delays. Once
-    /// complete, the controller waits for the next full extinguishment.
+    /// Builds smoke from the stove outward on first ignition. Later ignitions restore
+    /// all zones together from their current appearance.
     /// </summary>
     private void UpdateRestoration(double currentTime)
     {
         float elapsedTime = Mathf.Max(0f, (float)(currentTime - stateStartTime));
-        float progress = GetTransitionProgress(elapsedTime, reignitionRestoreDuration);
-        float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+        bool everyZoneFinished = true;
 
         for (int i = 0; i < runtimeZones.Count; i++)
         {
             SmokeZoneRuntime zone = runtimeZones[i];
+            float zoneElapsedTime = isInitialGrowth
+                ? elapsedTime - zone.initialGrowthDelay
+                : elapsedTime;
+            float duration = isInitialGrowth
+                ? initialGrowthDuration
+                : reignitionRestoreDuration;
+            float progress = GetTransitionProgress(zoneElapsedTime, duration);
+            if (progress < 1f)
+                everyZoneFinished = false;
+
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
             float alpha = Mathf.Lerp(zone.transitionStartAlpha, zone.authoredAlpha, easedProgress);
             float colorIntensity = Mathf.Lerp(
                 zone.transitionStartColorIntensity,
@@ -393,7 +468,7 @@ public class RoomSmokeController : MonoBehaviour
             ApplySmokeAppearance(zone, alpha, colorIntensity);
         }
 
-        if (progress >= 1f)
+        if (everyZoneFinished)
             currentState = SmokeState.Visible;
     }
 
