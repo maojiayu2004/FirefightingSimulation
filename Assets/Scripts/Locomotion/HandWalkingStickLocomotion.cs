@@ -12,7 +12,8 @@ using UnityEngine.XR.Interaction.Toolkit.Locomotion.Movement;
 ///  Walk: make a fist with either hand, as if gripping a walking stick, and swing it forward and back
 ///  from the shoulder. The faster the swing, the faster the player walks (up to the move provider's
 ///  Move Speed), in the direction the head faces. One swinging fist is enough, so the player can walk
-///  while the other hand holds the extinguisher. A hand that is holding something never walks.
+///  while the other hand holds the extinguisher. A hand that is holding something, or spraying the extinguisher
+///  (<see cref="HandSprayGesture"/>), never walks.
 ///
 ///  Turn: physically turn the body. There is deliberately no turn gesture: an earlier thumbs-up tilt
 ///  gesture misfired while the thumb was still tucking into the fist and spun the view, which caused
@@ -119,8 +120,8 @@ public class HandWalkingStickLocomotion : MonoBehaviour
         if (subsystem != null && head != null)
         {
             GetHeadFrame(out Vector3 headPosition, out Vector3 forward);
-            UpdateHand(subsystem.leftHand, leftHandInteractor, ref _left, headPosition, forward, deltaTime, ref swingSpeed, ref anyFist);
-            UpdateHand(subsystem.rightHand, rightHandInteractor, ref _right, headPosition, forward, deltaTime, ref swingSpeed, ref anyFist);
+            UpdateHand(subsystem.leftHand, Handedness.Left, leftHandInteractor, ref _left, headPosition, forward, deltaTime, ref swingSpeed, ref anyFist);
+            UpdateHand(subsystem.rightHand, Handedness.Right, rightHandInteractor, ref _right, headPosition, forward, deltaTime, ref swingSpeed, ref anyFist);
         }
         else
         {
@@ -135,11 +136,11 @@ public class HandWalkingStickLocomotion : MonoBehaviour
         WriteInputs();
     }
 
-    private void UpdateHand(XRHand hand, XRBaseInteractor interactor, ref HandState state,
+    private void UpdateHand(XRHand hand, Handedness handedness, XRBaseInteractor interactor, ref HandState state,
         Vector3 headPosition, Vector3 forward, float deltaTime,
         ref float swingSpeed, ref bool anyFist)
     {
-        if (!hand.isTracked || (interactor != null && interactor.hasSelection))
+        if (!hand.isTracked || (interactor != null && interactor.hasSelection) || HandSprayGesture.IsSprayingWith(handedness))
         {
             state = default;
             return;
