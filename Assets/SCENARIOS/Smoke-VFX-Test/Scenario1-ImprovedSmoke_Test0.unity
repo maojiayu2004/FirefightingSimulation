@@ -15957,7 +15957,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -0.03999996, y: 1.451, z: 4.79}
@@ -19081,7 +19081,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: 2.23, y: 1.451, z: 8.59}
@@ -23427,7 +23427,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -2.31, y: 1.451, z: 4.79}
@@ -31506,7 +31506,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: 2.23, y: 1.451, z: 6.69}
@@ -40938,7 +40938,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: 2.23, y: 1.451, z: 4.79}
@@ -51048,7 +51048,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: 1.6800001, y: 1.451, z: 2.97}
@@ -58011,7 +58011,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -4.663, y: 0, z: 6.04}
@@ -72169,8 +72169,8 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
-  m_Antialiasing: 0
+  m_RenderPostProcessing: 1
+  m_Antialiasing: 1
   m_AntialiasingQuality: 2
   m_StopNaN: 0
   m_Dithering: 0
@@ -112970,7 +112970,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -0.03999996, y: 1.451, z: 8.59}
@@ -126323,7 +126323,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -0.03999996, y: 1.451, z: 6.69}
@@ -134638,7 +134638,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -4.290474, y: 0.52336466, z: 7.162122}
@@ -145747,7 +145747,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -4.663, y: 0, z: 6.04}
@@ -147065,7 +147065,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -2.31, y: 1.451, z: 6.69}
@@ -166034,7 +166034,7 @@ MonoBehaviour:
   smokeRange: 5
   fireRefreshInterval: 1
   edgeColor: {r: 0.8, g: 0.08, b: 0.08, a: 1}
-  maximumIntensity: 0.32
+  maximumIntensity: 0.841
   edgeSmoothness: 0.65
   fadeInSeconds: 0.5
   fadeOutSeconds: 0.8
@@ -168643,7 +168643,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -2.31, y: 1.451, z: 8.59}
@@ -178610,7 +178610,7 @@ VisualEffect:
         m_Overridden: 1
     m_Vector3f:
       m_Array:
-      - m_Value: {x: 4.3255215, y: 9.456484, z: 5.120227}
+      - m_Value: {x: 4.6046743, y: 22.428246, z: -21.351984}
         m_Name: AdditionalCameraPosition
         m_Overridden: 1
       - m_Value: {x: -4.290474, y: 0.52336466, z: 7.162122}
