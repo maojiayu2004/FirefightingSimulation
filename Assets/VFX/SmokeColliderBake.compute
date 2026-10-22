@@ -1,0 +1,46 @@
+#pragma kernel Bake
+StructuredBuffer<float4> Vertices;
+StructuredBuffer<int2> Ranges;
+StructuredBuffer<int> Indices;
+RWTexture3D<float4> Field;
+float3 FieldMin;
+float VoxelSize;
+int3 Dimensions;
+int3 BinDimensions;
+float BinSize;
+float MaxDistance;
+
+float3 ClosestTriangle(float3 p,float3 a,float3 b,float3 c)
+{
+    float3 ab=b-a,ac=c-a,ap=p-a;
+    float d1=dot(ab,ap),d2=dot(ac,ap);
+    if(d1<=0 && d2<=0)return a;
+    float3 bp=p-b;float d3=dot(ab,bp),d4=dot(ac,bp);
+    if(d3>=0 && d4<=d3)return b;
+    float vc=d1*d4-d3*d2;
+    if(vc<=0 && d1>=0 && d3<=0)return a+ab*(d1/max(1e-12,d1-d3));
+    float3 cp=p-c;float d5=dot(ab,cp),d6=dot(ac,cp);
+    if(d6>=0 && d5<=d6)return c;
+    float vb=d5*d2-d1*d6;
+    if(vb<=0 && d2>=0 && d6<=0)return a+ac*(d2/max(1e-12,d2-d6));
+    float va=d3*d6-d5*d4;
+    if(va<=0 && d4-d3>=0 && d5-d6>=0)return b+(c-b)*((d4-d3)/max(1e-12,d4-d3+d5-d6));
+    float inv=rcp(max(1e-12,va+vb+vc));return a+ab*(vb*inv)+ac*(vc*inv);
+}
+[numthreads(4,4,4)]
+void Bake(uint3 id:SV_DispatchThreadID)
+{
+    if(any(id>=(uint3)Dimensions))return;
+    float3 p=FieldMin+((float3)id+0.5)*VoxelSize;
+    int3 bin=clamp((int3)floor((p-FieldMin)/BinSize),0,BinDimensions-1);
+    int index=bin.x+BinDimensions.x*(bin.y+BinDimensions.y*bin.z);
+    int2 range=Ranges[index];float best=MaxDistance*MaxDistance;float3 direction=0;
+    for(int i=0;i<range.y;i++)
+    {
+        int tri=Indices[range.x+i]*3;
+        float3 a=Vertices[tri].xyz,b=Vertices[tri+1].xyz,c=Vertices[tri+2].xyz;
+        float3 q=ClosestTriangle(p,a,b,c),v=p-q;float d=dot(v,v);
+        if(d<best){best=d;direction=d>1e-12?v*rsqrt(d):normalize(cross(b-a,c-a));}
+    }
+    Field[id]=float4(direction,sqrt(best));
+}

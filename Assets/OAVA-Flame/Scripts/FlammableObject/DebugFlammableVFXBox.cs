@@ -111,9 +111,11 @@ namespace Ignis
                     }
 
 #if UNITY_EDITOR
-                    if (Application.isEditor)
+                    // Game-only layouts and editor startup may have no Scene View camera.
+                    var sceneView = UnityEditor.SceneView.lastActiveSceneView;
+                    if (sceneView != null && sceneView.camera != null && fire.HasVector3("AdditionalCameraPosition"))
                     {
-                        fire.SetVector3("AdditionalCameraPosition", UnityEditor.SceneView.lastActiveSceneView.camera.transform.position);
+                        fire.SetVector3("AdditionalCameraPosition", sceneView.camera.transform.position);
                     }
 #endif
                     if (FlameEngine.instance)

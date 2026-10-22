@@ -1,0 +1,22 @@
+Geometry smoke test usage
+
+Open ParticleSmokeGeometry.unity in this folder. This is a copy of the integrated test house. Only the latest particle smoke scene and graph are retained. The original project smoke system remains unchanged.
+
+Tools > Smoke Geometry > Run Geometry Recording runs the real-source offline test: stove at 2 seconds, chair at 45 seconds, stove extinguished at 90 seconds, then waits for residual particles to disappear. Cameras remain at fixed positions. No ignition timer is saved in the scene. Normcore automatic room joining is suppressed only in the transient test run, before Start. Fire/network components remain present.
+
+
+Tools > Smoke Geometry > Run GPU Contact Probes checks real GPU texture queries at the doorway, a solid wall, floor, ceiling, dining table, and a glancing wall trajectory. These probes complement visual recordings; they are not an exhaustive proof for every particle.
+
+Geometry mode assigns SmokeCollisionField and ParticleRoomSmokeGeometry.vfx to each ParticleRoomSmoke. Its HLSL has no RoomMin/RoomMax position clamp or room-driven emission crop. Automatic VFX render bounds follow particles. The texture boundary does not collide: outside lookup coverage is free space.
+
+Scene geometry is baked from active, enabled, non-trigger MeshCollider and BoxCollider components under RoomGenerator/House. Trigger volumes and the fire/water Hitbox children are excluded. Missing solid geometry in this test copy receives matching mesh colliders. The existing kitchen ceiling is enabled. Closed glass remains solid and the disabled door remains open. See the generated collider audit and repair lists under ../particle-smoke-results/geometry.
+
+The bake uses actual collider triangles to store nearest unsigned surface distance and a surface-away normal in a 3D RGBAHalf texture. This is a two-sided static surface field, not a signed interior-volume solver or fluid-pressure simulation. Four motion substeps project particle centers away from contact and remove inward velocity, preserving tangential velocity. Existing buoyancy, eddies, visual size growth, age fade and lifecycle consumption remain. Ceiling layering now samples actual overhead surfaces. Per-particle horizontal transport has no box-relative destination.
+
+Geometry settings: 192 particles/second/source; 8192 capacity/source; existing 30-second nominal lifetime, 1.1 rise speed, 0.7 ceiling speed, 0.24 turbulence, 0.45-to-1.05 visual size and 0.13 opacity are retained. Collision radius is 0.08 and the field voxel is 0.12 world units. The conservative contact clearance also includes interpolation margin. These are visual smoke parameters, not physical smoke mass/concentration units.
+
+Static bake limitation: after moving furniture, opening/closing a physical door, or changing collision meshes, exit Play Mode and rebake. Current coverage is the test house plus a lookup margin, not the distant city. Narrow openings and small features are approximate at the selected voxel spacing. Billboards have visual extent beyond particle centers and rely on scene depth/soft particles; center contact checks alone cannot guarantee zero sprite-edge artifacts from every camera angle.
+
+Updating HLSL requires Tools > Smoke Geometry > Update Geometry Graph Only because the VFX custom blocks store their HLSL inline. Editing the loose HLSL alone does not replace the compiled graph block. Preserve any unsaved scene edits first.
+
+Runtime results are outside Assets at ../particle-smoke-results/geometry. Camera frames have measured simulation and wall timestamps in frames.csv; videos preserve wall-clock timing, repeating sampled frames at container frame rate rather than inventing intermediate motion. The final video is ../particle-smoke-results/geometry/after/kitchen-and-door.mp4. Only selected final screenshots are retained; frame dumps and earlier recordings have been removed. Recording includes editor and image-readback overhead; it is not a headset benchmark.

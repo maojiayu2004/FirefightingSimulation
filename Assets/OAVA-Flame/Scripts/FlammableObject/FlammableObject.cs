@@ -344,7 +344,7 @@ namespace Ignis
 
             if (useMaterialAnimationOnAllRenderers)
             {
-                animateMaterialsRenderers = gameObject.GetComponentsInChildren<Renderer>().ToList();
+                animateMaterialsRenderers = gameObject.GetComponentsInChildren<Renderer>().Where(IsObjectRenderer).ToList();
             }
 
             foreach (Light light in flameLights)
@@ -479,7 +479,7 @@ namespace Ignis
         public void SaveOriginalMaterialShaderProperties()
         {
             originalMaterialValues.Clear();
-            Renderer[] rends = gameObject.GetComponentsInChildren<Renderer>();
+            Renderer[] rends = gameObject.GetComponentsInChildren<Renderer>().Where(IsObjectRenderer).ToArray();
             if (rends.Length > 0)
             {
                 foreach (Renderer rend in rends)
@@ -1245,6 +1245,13 @@ namespace Ignis
             }
         }
 
+        // Child smoke VFX is not burnable object geometry. Including it both tries
+        // to edit graph-owned materials and inflates the object's fire bounds.
+        private static bool IsObjectRenderer(Renderer renderer)
+        {
+            return renderer != null && !(renderer is ParticleSystemRenderer) && renderer.GetComponent<VisualEffect>() == null;
+        }
+
         private void UpdateShaders()
         {
             FlameEngine flameEngine = FlameEngine.instance;
@@ -1258,7 +1265,7 @@ namespace Ignis
                 {
                     foreach (Renderer rend in rends)
                     {
-                        if (rend == null)
+                        if (!IsObjectRenderer(rend))
                             continue;
 
                         for (int i = 0; i < rend.materials.Length; i++)
@@ -1311,7 +1318,7 @@ namespace Ignis
 
             if (enableMaterialAnimation)
             {
-                Renderer[] rends = gameObject.GetComponentsInChildren<Renderer>();
+                Renderer[] rends = gameObject.GetComponentsInChildren<Renderer>().Where(IsObjectRenderer).ToArray();
 
                 if (rends.Length > 0)
                 {
@@ -1376,7 +1383,7 @@ namespace Ignis
             Quaternion origRot = flamObj.transform.rotation;
 
             flamObj.transform.rotation = Quaternion.Euler(Vector3.zero);
-            List<Renderer> rends = flamObj.GetComponentsInChildren<Renderer>().ToList();
+            List<Renderer> rends = flamObj.GetComponentsInChildren<Renderer>().Where(IsObjectRenderer).ToList();
             if (rends.Count <= 0)
             {
                 Debug.LogWarning("Automatic collider calculation failed: No renderers on the object");
@@ -1420,7 +1427,7 @@ namespace Ignis
 
         private void CalculateApproxSize()
         {
-            List<Renderer> rends = GetComponentsInChildren<Renderer>().ToList();
+            List<Renderer> rends = GetComponentsInChildren<Renderer>().Where(IsObjectRenderer).ToList();
             if (rends.Count <= 0)
             {
                 approxSize = 1;
@@ -2014,8 +2021,7 @@ namespace Ignis
         private bool TryGetVisualEmissionBox(BoxCollider box, out Vector3 worldCenter, out Vector3 worldSize)
         {
             Renderer[] renderers = GetComponentsInChildren<Renderer>()
-                .Where(renderer => renderer != null && renderer.enabled &&
-                                   !(renderer is ParticleSystemRenderer) &&
+                .Where(renderer => IsObjectRenderer(renderer) && renderer.enabled &&
                                    renderer.bounds.Intersects(box.bounds))
                 .ToArray();
 

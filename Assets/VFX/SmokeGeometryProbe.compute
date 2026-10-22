@@ -1,0 +1,34 @@
+#pragma kernel Probe
+Texture3D<float4> ProbeField;
+SamplerState linear_clamp_sampler;
+StructuredBuffer<float4> Starts;
+StructuredBuffer<float4> Velocities;
+RWStructuredBuffer<float4> Results;
+float3 FieldMin,FieldSize;
+float Clearance;
+// Diagnostic GPU trajectories through the baked scene, using the production contact projection.
+[numthreads(8,1,1)]
+void Probe(uint id:SV_DispatchThreadID)
+{
+    if(id>=6)return;
+    float3 p=Starts[id].xyz,v=Velocities[id].xyz;
+    for(int frame=0;frame<40;frame++)
+    {
+        float4 surface=ProbeField.SampleLevel(linear_clamp_sampler,(p-FieldMin)/FieldSize,0);
+        for(int step=0;step<4;step++)
+        {
+            float3 q=p+v*.0125;
+            float4 hit=ProbeField.SampleLevel(linear_clamp_sampler,(q-FieldMin)/FieldSize,0);
+            if(hit.w<Clearance)
+            {
+                float3 normal=hit.xyz;
+                if(dot(normal,surface.xyz)<-.1 && surface.w<.4)normal=surface.xyz;
+                normal=length(normal)>.1?normalize(normal):normalize(-v+float3(0,.001,0));
+                q+=normal*(Clearance-hit.w);
+                v-=normal*min(0,dot(v,normal));
+            }
+            p=q;surface=hit;
+        }
+    }
+    Results[id]=float4(p,length(v));
+}
