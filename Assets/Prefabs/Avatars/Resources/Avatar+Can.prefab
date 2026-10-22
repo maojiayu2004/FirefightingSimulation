@@ -356,6 +356,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6054135282492367298}
   - component: {fileID: 7614112240696031636}
+  - component: {fileID: 6068970613701854999}
   m_Layer: 10
   m_Name: Alt_FireAvatar_IK
   m_TagString: Untagged
@@ -638,6 +639,21 @@ MonoBehaviour:
       onRightFootstep:
         m_PersistentCalls:
           m_Calls: []
+--- !u!114 &6068970613701854999
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904758312562461840}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2be9f81de8d3d00439266cc44c6b6b32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  body: {fileID: 5133185585322381943}
+  headLayer: LocalPlayerHead
+  headWeight: 0.5
 --- !u!1 &933875612582707053
 GameObject:
   m_ObjectHideFlags: 0
