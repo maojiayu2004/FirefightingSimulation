@@ -110,8 +110,8 @@ public class Spray : MonoBehaviour
         {
             // Offline fallback: original local behavior.
             if (waterParticles == null) return;
-            if (spraying && !waterParticles.isPlaying) waterParticles.Play();
-            else if (!spraying && waterParticles.isPlaying) waterParticles.Stop();
+            if (spraying && !waterParticles.isEmitting) waterParticles.Play();
+            else if (!spraying && waterParticles.isEmitting) waterParticles.Stop();
         }
     }
 }

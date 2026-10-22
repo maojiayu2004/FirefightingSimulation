@@ -323,9 +323,20 @@ public class HolsterGrab : MonoBehaviour, IXRSelectFilter
             holder.EndManualInteraction();
     }
 
-    /// <summary>The tracked hand's Near-Far Interactor: the empty one of that hand whose grab point is nearest the palm.</summary>
+    /// <summary>
+    /// The tracked hand's own Near-Far Interactor, the one HandSprayGesture sprays through. With the OpenXR hand
+    /// interaction profile, that side's controller interactor is active too and follows the hand, often nearer the
+    /// palm, but a can held by it could never be sprayed by hand. Without a spray gesture in the scene: the empty
+    /// Near-Far Interactor of that hand whose grab point is nearest the palm.
+    /// </summary>
     private bool TryFindInteractor(InteractorHandedness side, Vector3 palm, out NearFarInteractor found)
     {
+        if (HandSprayGesture.HandInteractor(side == InteractorHandedness.Left ? Handedness.Left : Handedness.Right) is NearFarInteractor handInteractor)
+        {
+            found = handInteractor.isActiveAndEnabled && !handInteractor.hasSelection ? handInteractor : null;
+            return found != null;
+        }
+
         found = null;
         float best = 0.3f * 0.3f;
         extinguisher.interactionManager.GetRegisteredInteractors(s_Interactors);

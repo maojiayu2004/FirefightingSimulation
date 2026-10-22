@@ -1,7 +1,9 @@
 using Normal.Realtime;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Filtering;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 /// <summary>
 /// Bridges XR Interaction Toolkit grabbing and Normcore ownership for a shared,
@@ -23,9 +25,13 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 ///    Ownership transfers to the next player who grabs the tool (takeover is allowed
 ///    on these views), and Normcore clears ownership automatically if the owner
 ///    disconnects. SpraySync handles the disconnect-while-spraying cleanup.
+///  - A tool that is part of another player's avatar (the extinguisher on their hip)
+///    cannot be hovered or grabbed. That player owns their avatar's root view, so
+///    Normcore refuses ownership of anything under it: the grab would look like it
+///    worked, but moving or spraying the tool would never reach the network.
 /// </summary>
 [RequireComponent(typeof(XRGrabInteractable))]
-public class NetworkedGrabInteractable : MonoBehaviour
+public class NetworkedGrabInteractable : MonoBehaviour, IXRHoverFilter, IXRSelectFilter
 {
     [SerializeField] private XRGrabInteractable _grabInteractable;
     [SerializeField] private RealtimeView _realtimeView;
@@ -48,6 +54,8 @@ public class NetworkedGrabInteractable : MonoBehaviour
 
         _grabInteractable.selectEntered.AddListener(OnSelectEntered);
         _grabInteractable.selectExited.AddListener(OnSelectExited);
+        _grabInteractable.hoverFilters.Add(this);
+        _grabInteractable.selectFilters.Add(this);
         _subscribed = true;
     }
 
@@ -58,7 +66,23 @@ public class NetworkedGrabInteractable : MonoBehaviour
 
         _grabInteractable.selectEntered.RemoveListener(OnSelectEntered);
         _grabInteractable.selectExited.RemoveListener(OnSelectExited);
+        _grabInteractable.hoverFilters.Remove(this);
+        _grabInteractable.selectFilters.Remove(this);
         _subscribed = false;
+    }
+
+    public bool canProcess => isActiveAndEnabled;
+
+    public bool Process(IXRHoverInteractor interactor, IXRHoverInteractable interactable) => !IsOnAnotherPlayersAvatar();
+
+    public bool Process(IXRSelectInteractor interactor, IXRSelectInteractable interactable) => !IsOnAnotherPlayersAvatar();
+
+    // Checks the views above this one, not this tool's own view: a dropped shared tool that another
+    // player still owns must stay grabbable (takeover is allowed), but one under their avatar is not.
+    private bool IsOnAnotherPlayersAvatar()
+    {
+        var parentView = transform.parent != null ? transform.parent.GetComponentInParent<RealtimeView>() : null;
+        return parentView != null && parentView.isOwnedRemotelyInHierarchy;
     }
 
     private void OnSelectEntered(SelectEnterEventArgs args)

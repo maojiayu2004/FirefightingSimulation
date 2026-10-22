@@ -48,6 +48,9 @@ public class HandSprayGesture : MonoBehaviour, IXRInputButtonReader
     // Indexed by Handedness: which hands are currently spraying.
     private static readonly bool[] s_Spraying = new bool[3];
 
+    // Indexed by Handedness: each hand's Near-Far interactor, whose activate input this gesture is.
+    private static readonly XRBaseInputInteractor[] s_HandInteractors = new XRBaseInputInteractor[3];
+
     private XRBaseInputInteractor _freeHandSelect;
     private bool _isPerformed;
     private bool _wasPerformedThisFrame;
@@ -61,6 +64,13 @@ public class HandSprayGesture : MonoBehaviour, IXRInputButtonReader
 
     /// <summary>Whether this hand is the free hand on a held sprayer, spraying.</summary>
     public static bool IsSprayingWith(Handedness hand) => s_Spraying[(int)hand];
+
+    /// <summary>
+    /// A hand's own Near-Far interactor, whose activate input this gesture is: a sprayer must be held with it for the
+    /// gesture to spray it. Null when there is none. (With the OpenXR hand interaction profile, the controller's
+    /// interactor on the same side is active too and follows the hand, but it does not have this gesture.)
+    /// </summary>
+    public static XRBaseInputInteractor HandInteractor(Handedness hand) => s_HandInteractors[(int)hand];
 
     private void Awake()
     {
@@ -79,11 +89,19 @@ public class HandSprayGesture : MonoBehaviour, IXRInputButtonReader
         holdingInteractor.activateInput.SetObjectReference(this);
     }
 
+    private void OnEnable()
+    {
+        if (holdingInteractor != null)
+            s_HandInteractors[(int)holdingHand] = holdingInteractor;
+    }
+
     private void OnDisable()
     {
         SetPerformed(false);
         BlockFreeHand(false);
         s_Spraying[(int)FreeHand] = false;
+        if (s_HandInteractors[(int)holdingHand] == holdingInteractor)
+            s_HandInteractors[(int)holdingHand] = null;
     }
 
     private void Update()

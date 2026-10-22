@@ -162,10 +162,11 @@ public class SpraySync : RealtimeComponent<SpraySyncModel>
         if (sprayParticles == null)
             return;
 
-        // Only touch the particle system on actual transitions.
-        if (isSpraying && !sprayParticles.isPlaying)
+        // Only touch the particle system on actual transitions. Check emitting, not playing: a stopped system still
+        // counts as playing until its last water lands, so checking playing would skip a quick restart.
+        if (isSpraying && !sprayParticles.isEmitting)
             sprayParticles.Play();
-        else if (!isSpraying && sprayParticles.isPlaying)
+        else if (!isSpraying && sprayParticles.isEmitting)
             sprayParticles.Stop();
     }
 }
