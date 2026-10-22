@@ -21,7 +21,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 ///  - Hold: sticky. A relaxed grip keeps it, and short tracking dropouts are ignored. It is let go only after the
 ///    hand has been clearly open for Release Time, or lost by tracking for Lost Tracking Grace.
 ///  - Only the holding hand can have it: this is a select filter on the extinguisher that turns away every other
-///    grab, so the free hand pinching or grabbing near it to spray (HandSprayGesture) cannot pull it across.
+///    grab, so the free hand pinching or making a fist to spray (HandSprayGesture) cannot pull it across.
 /// Controllers work too: grip in the zone takes it, releasing grip lets go.
 ///
 /// The grab is an XRI manual interaction on that hand's Near-Far Interactor, so NetworkedGrabInteractable takes

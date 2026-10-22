@@ -8,8 +8,8 @@ using UnityEngine.XR.Hands;
 ///
 ///  Closed: a fist (index, middle and ring curled) or a pinch (thumb and index tips together), whichever comes
 ///  naturally. Hysteresis makes it easier to stay closed than to close, so a relaxed grip does not flicker open.
-///  Loosely closed: a looser version for spraying, where triggering should be too easy rather than hard: a pinch
-///  with the tips a little apart, or the fingers curled on average (a loose grab around the hose), not a tight fist.
+///  Loosely closed: a looser version: a pinch with the tips a little apart, or the fingers curled on average, not a
+///  tight fist. A hand that is not even loosely closed is properly unclenched (the holster grab's open hand).
 ///  Clearly open: index, middle and ring all mostly straight and the thumb away from the index. Anything in
 ///  between counts as still holding, which keeps a carried object in a relaxed hand.
 ///

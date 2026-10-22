@@ -11,9 +11,9 @@ using UnityEngine.XR.Interaction.Toolkit.Locomotion.Movement;
 ///
 ///  Walk: make a fist with either hand, as if gripping a walking stick, and swing it forward and back
 ///  from the shoulder. The faster the swing, the faster the player walks (up to the move provider's
-///  Move Speed), in the direction the head faces. One swinging fist is enough, so the player can walk
-///  while the other hand holds the extinguisher. A hand that is holding something, or spraying the extinguisher
-///  (<see cref="HandSprayGesture"/>), never walks.
+///  Move Speed), in the direction the head faces. One swinging fist is enough. A hand that is holding something,
+///  or spraying the extinguisher (<see cref="HandSprayGesture"/>), never walks. While the extinguisher is held, a
+///  fist with the free hand sprays, so the free hand walks only until it first opens after the extinguisher is taken.
 ///
 ///  Turn: physically turn the body. There is deliberately no turn gesture: an earlier thumbs-up tilt
 ///  gesture misfired while the thumb was still tucking into the fist and spun the view, which caused
