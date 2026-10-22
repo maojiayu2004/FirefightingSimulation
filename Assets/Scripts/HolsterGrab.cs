@@ -15,8 +15,9 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 /// Built for hand tracking used by people new to VR:
 ///  - Grab zone: a sphere of Zone Radius around the top of the holstered extinguisher, so a rough reach is enough.
 ///    The extinguisher lights up while an open hand is in the zone, to show it can be taken.
-///  - Grab: the hand has to close in the zone (or within Close Window of arriving there), so a walking-stick fist
-///    swinging past does not take it.
+///  - Grab: an open hand has to close in the zone (or within Close Window of arriving there) while moving slowly.
+///    A walking-stick fist swinging past the hip does not take it: it was never open, a fist that flickers open or
+///    comes back after a tracking dropout is not open for long enough, and the swing is too fast.
 ///  - Hold: sticky. A relaxed grip keeps it, and short tracking dropouts are ignored. It is let go only after the
 ///    hand has been clearly open for Release Time, or lost by tracking for Lost Tracking Grace.
 ///  - Only the holding hand can have it: this is a select filter on the extinguisher that turns away every other
@@ -42,6 +43,12 @@ public class HolsterGrab : MonoBehaviour, IXRSelectFilter
     [Tooltip("Seconds a hand may have been closed before reaching the zone and still grab, since people close their hand as they arrive.")]
     [SerializeField] private float closeWindow = 0.35f;
 
+    [Tooltip("Seconds the hand must have been open, shortly before it closes, for the close to grab. Stops a walking-stick fist that flickers open, or that tracking loses and finds again, from grabbing.")]
+    [SerializeField] private float openBeforeGrab = 0.25f;
+
+    [Tooltip("Fastest the hand may be moving relative to the head when it grabs, in m/s. A reaching hand slows down to grab, while a walking-stick swing passes the hip at speed.")]
+    [SerializeField] private float maxGrabSpeed = 0.8f;
+
     [Header("Hold")]
     [Tooltip("Seconds the holding hand must be clearly open before the extinguisher goes back in the holster.")]
     [SerializeField] private float releaseTime = 0.25f;
@@ -57,14 +64,31 @@ public class HolsterGrab : MonoBehaviour, IXRSelectFilter
     private static readonly int s_BaseColor = Shader.PropertyToID("_BaseColor");
     private static readonly int s_Color = Shader.PropertyToID("_Color");
 
+    // Longest a hand may take to close once it stops being open, for that open hand to count towards a grab.
+    private const float k_ClosingTime = 1f;
+
+    // Seconds to smooth the hand speed over, against tracking jitter.
+    private const float k_SpeedSmoothing = 0.08f;
+
     private struct HandState
     {
         public bool isClosed;
         public float closedAt;
+        public bool openedFirst;
+
+        public bool isOpen;
+        public float openSince;
+        public float openFor;
+        public float openUntil;
+
+        public bool hasOffset;
+        public Vector3 offset;
+        public float speed;
     }
 
     private RealtimeView _avatarView;
     private Transform _trackingSpace;
+    private Transform _head;
     private Renderer[] _renderers;
     private MaterialPropertyBlock _highlightBlock;
     private bool _highlighted;
@@ -117,13 +141,18 @@ public class HolsterGrab : MonoBehaviour, IXRSelectFilter
         {
             var origin = FindAnyObjectByType<XROrigin>();
             if (origin != null)
+            {
                 _trackingSpace = origin.CameraFloorOffsetObject.transform;
+                _head = origin.Camera != null ? origin.Camera.transform : null;
+            }
         }
 
         var subsystem = HandGrip.GetSubsystem();
         if (_holder != null)
         {
             SetHighlight(false);
+            _left = default;
+            _right = default;
             UpdateHold(subsystem);
             return;
         }
@@ -131,6 +160,8 @@ public class HolsterGrab : MonoBehaviour, IXRSelectFilter
         if (extinguisher.isSelected)
         {
             SetHighlight(false);
+            _left = default;
+            _right = default;
             return;
         }
 
@@ -151,29 +182,72 @@ public class HolsterGrab : MonoBehaviour, IXRSelectFilter
     {
         if (subsystem == null || !TryGetHand(subsystem, side, out XRHand hand) || !HandGrip.TryGetPalm(hand, _trackingSpace, out Vector3 palm))
         {
+            // Lost: whatever the hand is doing when tracking finds it again, it has not been seen open yet.
             state = default;
             return false;
         }
 
-        bool closed = HandGrip.IsClosed(hand, state.isClosed);
-        if (closed && !state.isClosed)
-            state.closedAt = Time.time;
-        state.isClosed = closed;
+        UpdateSpeed(ref state, palm);
+        UpdateOpenAndClosed(hand, ref state);
 
         bool inZone = (palm - zone).sqrMagnitude < zoneRadius * zoneRadius;
         if (!inZone)
             return false;
-        if (!closed)
+        if (!state.isClosed)
         {
             handInZone = true;
             return false;
         }
 
-        if (Time.time - state.closedAt > closeWindow || !TryFindInteractor(side, palm, out NearFarInteractor interactor))
+        if (!state.openedFirst || Time.time - state.closedAt > closeWindow || state.speed > maxGrabSpeed ||
+            !TryFindInteractor(side, palm, out NearFarInteractor interactor))
             return false;
 
         Grab(interactor, true);
         return true;
+    }
+
+    /// <summary>
+    /// Tracks when the hand is open and when it closes, and whether it was open for Open Before Grab just before it
+    /// closed. Open is a properly unclenched hand (not even loosely closed), so a loose walking-stick fist is not open.
+    /// </summary>
+    private void UpdateOpenAndClosed(XRHand hand, ref HandState state)
+    {
+        float now = Time.time;
+        bool open = !HandGrip.IsLooselyClosed(hand, false);
+        if (open && !state.isOpen)
+        {
+            state.openSince = now;
+        }
+        else if (!open && state.isOpen)
+        {
+            state.openFor = now - state.openSince;
+            state.openUntil = now;
+        }
+        state.isOpen = open;
+
+        bool closed = HandGrip.IsClosed(hand, state.isClosed);
+        if (closed && !state.isClosed)
+        {
+            state.closedAt = now;
+            state.openedFirst = state.openFor >= openBeforeGrab && now - state.openUntil <= k_ClosingTime;
+        }
+        state.isClosed = closed;
+    }
+
+    /// <summary>
+    /// Smoothed palm speed relative to the head, so the rig moving (walking-stick locomotion) or the player physically
+    /// walking does not count. It starts from zero when tracking finds the hand, but Open Before Grab means a hand has
+    /// been tracked for longer than the smoothing takes to catch up before it can grab.
+    /// </summary>
+    private void UpdateSpeed(ref HandState state, Vector3 palm)
+    {
+        Vector3 offset = _head != null ? palm - _head.position : palm;
+        float deltaTime = Time.deltaTime;
+        if (state.hasOffset && deltaTime > 0f)
+            state.speed = Mathf.Lerp(state.speed, (offset - state.offset).magnitude / deltaTime, 1f - Mathf.Exp(-deltaTime / k_SpeedSmoothing));
+        state.offset = offset;
+        state.hasOffset = true;
     }
 
     private bool TryControllerGrab(XRHandSubsystem subsystem, Vector3 zone, ref bool handInZone)
