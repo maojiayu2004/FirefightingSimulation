@@ -24,6 +24,9 @@ public static class ParticleSmokePrototypeTools
             else if(command=="fusion-build")SmokeFusionExperiment.Build();
             else if(command=="fusion-preview")SmokeFusionExperiment.Preview();
             else if(command=="fusion-seed")FusionRoomSmokeSetup.Seed();
+            else if(command=="kitchen-tour")KitchenSmokeTour.Launch();
+            else if(command=="restore-ceilings")RestoreSolidCeilings.Restore();
+            else if(command=="roof-colliders")RestoreSolidCeilings.AddRoofColliders();
             else if(command.StartsWith("geometry"))SmokeGeometryTools.Command(command);
         }catch(Exception error){Debug.LogException(error);}
     }

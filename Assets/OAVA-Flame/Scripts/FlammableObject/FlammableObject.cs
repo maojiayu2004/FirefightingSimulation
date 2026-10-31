@@ -1987,6 +1987,15 @@ namespace Ignis
                 Mathf.Abs(box.transform.lossyScale.y),
                 Mathf.Abs(box.transform.lossyScale.z));
 
+            // OnlySmoke volumes are the smoke clump itself. Emit through the whole
+            // box instead of the thin surface used by flames on furniture.
+            if (overrideFireVFX && overrideVFXVariant == FlameEngine.FireVFXVariant.OnlySmoke)
+            {
+                worldCenter = box.transform.TransformPoint(box.center);
+                worldSize = Vector3.Scale(localSize, absoluteScale);
+                return;
+            }
+
             bool isWall = IsWallCollider(box, localSize);
             if (!isWall && TryGetVisualEmissionBox(box, out worldCenter, out worldSize))
                 return;
